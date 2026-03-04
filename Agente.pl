@@ -41,21 +41,38 @@ concatenar_propia
 
 concatenar_append(L1,L2) :- lista(L1,Lt1),
     lista(L2,Lt2), append(Lt1,Lt2,Lr),
+    assert(concatenar_append(L1,L2,Lr)),
+    write("Listas concatenadas "), 
     write(Lr).
 
 %agregar
 agregar(E,NL) :- lista(NL,Lt),
     append([E],Lt,Lr),
+    retract(lista(NL,_)), %borra
+    assert(append(NL, Lr)), %guarda
+    write("Elemento agregado "), 
     write(Lr).
 
 %Eliminar
+eliminar(E,NL) :- lista(NL,Lt),
+    delete(Lt,E,Lr),
+    retract(lista(NL, _)),
+    assert(lista(NL,Lr)),
+    write("Elemento eliminado "), 
+    write(Lr).
 
 %Longitud
 tamanio(NL) :- lista(NL,Lt),
     length(Lt,N),
+    assert(tamanio(NL, N)), %guarda la lista ordenada
+    write("Longitud guardada "), 
     write(N).
 
 %Ordenamiento: predefinido sort o msort
-ordenar(NL) :- lista(NL,Lt),
+ordenar(NL) :- 
+    lista(NL,Lt),
     sort(Lt,Lr), %o msort
+    retract(lista(NL,_)), %elimina la lista anterior
+    assert(lista(NL, Lr)), %guarda la lista ordenada
+    write("Lista actualizada "), 
     write(Lr).
