@@ -1,4 +1,5 @@
 :- consult('BaseConocimiento.pl').
+:- consult('OperacionesListas.pl').
 
 limpiar :- write('\033[2J').
 
