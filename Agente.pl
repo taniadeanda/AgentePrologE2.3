@@ -1,6 +1,6 @@
 %INTEGRANTES
 %De Anda Lara Tania Citlaly <3
-
+%Gómez Navarro Juan Fernando
 
 
 %INSTRUCCIONES
