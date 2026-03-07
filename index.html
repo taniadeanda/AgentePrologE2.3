@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agente Meal Prep - Programación Funcional con Listas</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f7f7f8;
+      color: #1f2937;
+    }
+    .container {
+      max-width: 980px;
+      margin: 24px auto;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 20px;
+    }
+    h1 { margin-top: 0; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px;
+      background: #fcfcfd;
+    }
+    .card h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+    }
+    label { display: block; margin: 6px 0 4px; font-size: 13px; }
+    select, input, button {
+      width: 100%;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #d1d5db;
+      box-sizing: border-box;
+      margin-bottom: 8px;
+    }
+    button {
+      cursor: pointer;
+      background: #111827;
+      color: #fff;
+      border: none;
+    }
+    button.secondary { background: #4b5563; }
+    .output {
+      margin-top: 14px;
+      background: #0f172a;
+      color: #e5e7eb;
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 150px;
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+    }
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Agente: Planificador Semanal de Comidas</h1>
+    <p>Interfaz web del agente de listas (buscar, listar, concatenar, agregar, eliminar, longitud, ordenar y deducción de recetas).</p>
+
+    <div class="grid">
+      <section class="card">
+        <h3>Estado</h3>
+        <button id="btnVerListas">Ver nombres de listas</button>
+        <button id="btnVerEstado" class="secondary">Ver contenido completo</button>
+        <button id="btnReset" class="secondary">Reiniciar base</button>
+      </section>
+
+      <section class="card">
+        <h3>Crear nueva lista</h3>
+        <label for="nuevaListaNombre">Nombre de lista</label>
+        <input id="nuevaListaNombre" placeholder="ej. snacks" />
+        <label for="nuevaListaElementos">Elementos (separados por coma)</label>
+        <input id="nuevaListaElementos" placeholder="ej. nuez, almendra, pasas" />
+        <button id="btnCrearLista">Crear lista</button>
+      </section>
+
+      <section class="card">
+        <h3>Listar / Longitud / Ordenar</h3>
+        <label for="listaA">Lista</label>
+        <select id="listaA"></select>
+        <button id="btnListar">Listar elementos</button>
+        <button id="btnLongitud" class="secondary">Longitud</button>
+        <button id="btnOrdenar" class="secondary">Ordenar (msort)</button>
+      </section>
+
+      <section class="card">
+        <h3>Buscar / Agregar / Eliminar</h3>
+        <label for="listaB">Lista</label>
+        <select id="listaB"></select>
+        <label for="elemento">Elemento</label>
+        <input id="elemento" placeholder="ej. miel" />
+        <button id="btnBuscar">Buscar (si no está, pregunta agregar)</button>
+        <button id="btnAgregar" class="secondary">Agregar</button>
+        <button id="btnEliminar" class="secondary">Eliminar</button>
+      </section>
+
+      <section class="card">
+        <h3>Concatenar listas</h3>
+        <label for="listaC1">Primera lista</label>
+        <select id="listaC1"></select>
+        <label for="listaC2">Segunda lista</label>
+        <select id="listaC2"></select>
+        <button id="btnConcatenar">Concatenar (propia y append)</button>
+      </section>
+
+      <section class="card">
+        <h3>Deducción</h3>
+        <p style="margin-top: 0; font-size: 13px;">Calcula recetas posibles con ingredientes disponibles.</p>
+        <button id="btnRecetas">Ver recetas posibles</button>
+      </section>
+    </div>
+
+    <div class="output" id="salida"></div>
+  </div>
+
+  <script>
+    const estadoInicial = () => ({
+      disponibles: ["avena", "leche", "platano", "tomate", "tortilla", "pollo"],
+      compra_semana: ["huevo", "arroz", "frijol", "cebolla"],
+      recetas_favoritas: ["avena_desayuno", "tacos_pollo"]
+    });
+
+    const recetaDB = {
+      avena_desayuno: ["avena", "leche", "platano", "miel"],
+      ensalada_fresca: ["lechuga", "tomate", "pepino", "aceite_oliva"],
+      tacos_pollo: ["tortilla", "pollo", "cebolla", "cilantro"],
+      smoothie_fresa: ["leche", "fresa", "platano", "avena"],
+      pasta_vegetal: ["pasta", "tomate", "ajo", "aceite_oliva"]
+    };
+
+    let listas = estadoInicial();
+
+    const salida = document.getElementById("salida");
+    const listaSelectores = ["listaA", "listaB", "listaC1", "listaC2"].map(id => document.getElementById(id));
+
+    const escribir = (txt) => {
+      salida.textContent = txt;
+    };
+
+    const refreshSelects = () => {
+      const nombres = Object.keys(listas);
+      for (const sel of listaSelectores) {
+        const current = sel.value;
+        sel.innerHTML = "";
+        for (const n of nombres) {
+          const op = document.createElement("option");
+          op.value = n;
+          op.textContent = n;
+          sel.appendChild(op);
+        }
+        if (nombres.includes(current)) sel.value = current;
+      }
+    };
+
+    const listarElementos = (arr) => arr.map(x => `- ${x}`).join("\n");
+    const buscarElemento = (elemento, arr) => arr.includes(elemento);
+    const concatenarPropia = (l1, l2) => l1.length === 0 ? [...l2] : [l1[0], ...concatenarPropia(l1.slice(1), l2)];
+    const concatenarAppend = (l1, l2) => [...l1, ...l2];
+    const agregarElemento = (elemento, arr) => [...arr, elemento];
+    const eliminarElemento = (elemento, arr) => {
+      const idx = arr.indexOf(elemento);
+      if (idx === -1) return null;
+      return [...arr.slice(0, idx), ...arr.slice(idx + 1)];
+    };
+    const longitudLista = (arr) => arr.length;
+    const ordenarLista = (arr) => [...arr].sort();
+    const subsetLista = (sub, l) => sub.every(x => l.includes(x));
+
+    const recetaPosible = (disponibles) =>
+      Object.entries(recetaDB)
+        .filter(([, ingredientes]) => subsetLista(ingredientes, disponibles))
+        .map(([nombre]) => nombre);
+
+    document.getElementById("btnVerListas").onclick = () => {
+      escribir("Listas disponibles:\n" + Object.keys(listas).map(n => `- ${n}`).join("\n"));
+    };
+
+    document.getElementById("btnVerEstado").onclick = () => {
+      const txt = Object.entries(listas)
+        .map(([n, l]) => `${n}: [${l.join(", ")}]`)
+        .join("\n");
+      escribir("Estado actual:\n" + txt);
+    };
+
+    document.getElementById("btnReset").onclick = () => {
+      listas = estadoInicial();
+      refreshSelects();
+      escribir("Base reiniciada a valores iniciales.");
+    };
+
+    document.getElementById("btnCrearLista").onclick = () => {
+      const nombre = document.getElementById("nuevaListaNombre").value.trim();
+      const elementosRaw = document.getElementById("nuevaListaElementos").value.trim();
+
+      if (!nombre) {
+        escribir("Escribe un nombre para la nueva lista.");
+        return;
+      }
+
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(nombre)) {
+        escribir("Nombre no válido. Usa letras, números y guion bajo, iniciando con letra o _.");
+        return;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(listas, nombre)) {
+        escribir(`La lista '${nombre}' ya existe.`);
+        return;
+      }
+
+      const elementos = elementosRaw
+        ? elementosRaw.split(",").map(e => e.trim()).filter(Boolean)
+        : [];
+
+      listas[nombre] = elementos;
+      refreshSelects();
+      document.getElementById("nuevaListaNombre").value = "";
+      document.getElementById("nuevaListaElementos").value = "";
+      escribir(`Lista '${nombre}' creada correctamente con ${elementos.length} elemento(s).`);
+    };
+
+    document.getElementById("btnListar").onclick = () => {
+      const nombre = document.getElementById("listaA").value;
+      escribir(`Elementos de ${nombre}:\n` + listarElementos(listas[nombre]));
+    };
+
+    document.getElementById("btnLongitud").onclick = () => {
+      const nombre = document.getElementById("listaA").value;
+      escribir(`Longitud de ${nombre}: ${longitudLista(listas[nombre])}`);
+    };
+
+    document.getElementById("btnOrdenar").onclick = () => {
+      const nombre = document.getElementById("listaA").value;
+      listas[nombre] = ordenarLista(listas[nombre]);
+      escribir(`Lista ordenada y actualizada (${nombre}):\n` + listarElementos(listas[nombre]));
+    };
+
+    document.getElementById("btnBuscar").onclick = () => {
+      const nombre = document.getElementById("listaB").value;
+      const elemento = document.getElementById("elemento").value.trim();
+      if (!elemento) return escribir("Escribe un elemento.");
+
+      if (buscarElemento(elemento, listas[nombre])) {
+        escribir(`Elemento '${elemento}' encontrado en ${nombre}.`);
+      } else {
+        const agregar = window.confirm(`No se encontró '${elemento}' en ${nombre}. ¿Deseas agregarlo?`);
+        if (agregar) {
+          listas[nombre] = agregarElemento(elemento, listas[nombre]);
+          escribir(`Elemento agregado en ${nombre}.\n` + listarElementos(listas[nombre]));
+        } else {
+          escribir("No se realizaron cambios.");
+        }
+      }
+    };
+
+    document.getElementById("btnAgregar").onclick = () => {
+      const nombre = document.getElementById("listaB").value;
+      const elemento = document.getElementById("elemento").value.trim();
+      if (!elemento) return escribir("Escribe un elemento.");
+      listas[nombre] = agregarElemento(elemento, listas[nombre]);
+      escribir(`Elemento agregado en ${nombre}.\n` + listarElementos(listas[nombre]));
+    };
+
+    document.getElementById("btnEliminar").onclick = () => {
+      const nombre = document.getElementById("listaB").value;
+      const elemento = document.getElementById("elemento").value.trim();
+      if (!elemento) return escribir("Escribe un elemento.");
+      const nueva = eliminarElemento(elemento, listas[nombre]);
+      if (!nueva) {
+        escribir(`El elemento '${elemento}' no existe en ${nombre}.`);
+      } else {
+        listas[nombre] = nueva;
+        escribir(`Elemento eliminado de ${nombre}.\n` + listarElementos(listas[nombre]));
+      }
+    };
+
+    document.getElementById("btnConcatenar").onclick = () => {
+      const a = document.getElementById("listaC1").value;
+      const b = document.getElementById("listaC2").value;
+      const r1 = concatenarPropia(listas[a], listas[b]);
+      const r2 = concatenarAppend(listas[a], listas[b]);
+      escribir(
+        `Concatenar ${a} + ${b}:\n` +
+        `- Resultado (concatenar_propia): [${r1.join(", ")}]\n` +
+        `- Resultado (concatenar_append): [${r2.join(", ")}]`
+      );
+    };
+
+    document.getElementById("btnRecetas").onclick = () => {
+      const disponibles = listas.disponibles || [];
+      const posibles = recetaPosible(disponibles);
+      if (posibles.length === 0) {
+        escribir("Recetas posibles hoy:\n- Ninguna (faltan ingredientes)");
+      } else {
+        escribir("Ingredientes disponibles: [" + disponibles.join(", ") + "]\n\nRecetas posibles hoy:\n" + posibles.map(r => `- ${r}`).join("\n"));
+      }
+    };
+
+    refreshSelects();
+    escribir("Interfaz local lista. Abre este archivo en el navegador y úsalo sin servidor.");
+  </script>
+</body>
+</html>

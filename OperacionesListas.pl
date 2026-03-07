@@ -44,3 +44,35 @@ subset_lista([H|T], L) :-
 receta_posible(Disponibles, NombreReceta) :-
     receta(NombreReceta, Ingredientes),
     subset_lista(Ingredientes, Disponibles).
+
+% ===========================================
+% SOPORTE WEB (estado persistente entre requests)
+% ===========================================
+
+preparar_estado_web :-
+    retractall(lista(_, _)),
+    (   exists_file('EstadoWeb.pl')
+    ->  consult('EstadoWeb.pl')
+    ;   inicializar_listas,
+        guardar_estado_web
+    ).
+
+reiniciar_estado_web :-
+    retractall(lista(_, _)),
+    inicializar_listas,
+    guardar_estado_web.
+
+guardar_estado_web :-
+    open('EstadoWeb.pl', write, Stream),
+    write(Stream, ':- dynamic lista/2.'), nl(Stream),
+    forall(
+        lista(Nombre, Lista),
+        (writeq(Stream, lista(Nombre, Lista)), write(Stream, '.'), nl(Stream))
+    ),
+    close(Stream).
+
+nombres_listas(Nombres) :-
+    findall(Nombre, lista(Nombre, _), Nombres).
+
+recetas_posibles(Disponibles, Recetas) :-
+    findall(Receta, receta_posible(Disponibles, Receta), Recetas).
