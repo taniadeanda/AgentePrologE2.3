@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agente Meal Prep - Programación Funcional con Listas</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f7f7f8;
+      color: #1f2937;
+    }
+    .container {
+      max-width: 980px;
+      margin: 24px auto;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 20px;
+    }
+    h1 { margin-top: 0; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px;
+      background: #fcfcfd;
+    }
+    .card h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+    }
+    label { display: block; margin: 6px 0 4px; font-size: 13px; }
+    select, input, button {
+      width: 100%;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #d1d5db;
+      box-sizing: border-box;
+      margin-bottom: 8px;
+    }
+    button {
+      cursor: pointer;
+      background: #111827;
+      color: #fff;
+      border: none;
+    }
+    button.secondary { background: #4b5563; }
+    .output {
+      margin-top: 14px;
+      background: #0f172a;
+      color: #e5e7eb;
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 150px;
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+    }
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Agente: Planificador Semanal de Comidas</h1>
+    <p>Interfaz web del agente de listas (buscar, listar, concatenar, agregar, eliminar, longitud, ordenar y deducción de recetas).</p>
+
+    <div class="grid">
+      <section class="card">
+        <h3>Estado</h3>
+        <button id="btnVerListas">Ver nombres de listas</button>
+        <button id="btnVerEstado" class="secondary">Ver contenido completo</button>
+        <button id="btnReset" class="secondary">Reiniciar base</button>
+      </section>
+
+      <section class="card">
+        <h3>Crear nueva lista</h3>
+        <label for="nuevaListaNombre">Nombre de lista</label>
+        <input id="nuevaListaNombre" placeholder="ej. snacks" />
+        <label for="nuevaListaElementos">Elementos (separados por coma)</label>
+        <input id="nuevaListaElementos" placeholder="ej. nuez, almendra, pasas" />
+        <button id="btnCrearLista">Crear lista</button>
+      </section>
+
+      <section class="card">
+        <h3>Listar / Longitud / Ordenar</h3>
+        <label for="listaA">Lista</label>
+        <select id="listaA"></select>
+        <button id="btnListar">Listar elementos</button>
+        <button id="btnLongitud" class="secondary">Longitud</button>
+        <button id="btnOrdenar" class="secondary">Ordenar (msort)</button>
+      </section>
+
+      <section class="card">
+        <h3>Buscar / Agregar / Eliminar</h3>
+        <label for="listaB">Lista</label>
+        <select id="listaB"></select>
+        <label for="elemento">Elemento</label>
+        <input id="elemento" placeholder="ej. miel" />
+        <button id="btnBuscar">Buscar (si no está, pregunta agregar)</button>
+        <button id="btnAgregar" class="secondary">Agregar</button>
+        <button id="btnEliminar" class="secondary">Eliminar</button>
+      </section>
+
+      <section class="card">
+        <h3>Concatenar listas</h3>
+        <label for="listaC1">Primera lista</label>
+        <select id="listaC1"></select>
+        <label for="listaC2">Segunda lista</label>
+        <select id="listaC2"></select>
+        <button id="btnConcatenar">Concatenar (propia y append)</button>
+      </section>
+
+      <section class="card">
+        <h3>Deducción</h3>
+        <p style="margin-top: 0; font-size: 13px;">Calcula recetas posibles con ingredientes disponibles.</p>
+        <button id="btnRecetas">Ver recetas posibles</button>
+      </section>
+    </div>
+
+    <div class="output" id="salida"></div>
+  </div>
+
+  <script>
+    const salida = document.getElementById("salida");
+    const listaSelectores = ["listaA", "listaB", "listaC1", "listaC2"].map(id => document.getElementById(id));
+
+    const escribir = (txt) => {
+      salida.textContent = txt;
+    };
+
+    const request = async (url, options = {}) => {
+      const response = await fetch(url, options);
+      const data = await response.json();
+      if (!data.ok) {
+        throw new Error(data.error || "Error en API");
+      }
+      return data.data;
+    };
+
+    const refreshSelects = async () => {
+      const data = await request("/api/list_names");
+      const nombres = data.listas;
+      for (const sel of listaSelectores) {
+        const current = sel.value;
+        sel.innerHTML = "";
+        for (const n of nombres) {
+          const op = document.createElement("option");
+          op.value = n;
+          op.textContent = n;
+          sel.appendChild(op);
+        }
+        if (nombres.includes(current)) sel.value = current;
+      }
+    };
+
+    const listarElementos = (arr) => arr.map(x => `- ${x}`).join("\n");
+
+    document.getElementById("btnVerListas").onclick = async () => {
+      try {
+        const data = await request("/api/list_names");
+        escribir("Listas disponibles:\n" + data.listas.map(n => `- ${n}`).join("\n"));
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    document.getElementById("btnVerEstado").onclick = async () => {
+      try {
+        const data = await request("/api/full_state");
+        const txt = data.estado
+        .map(({nombre, elementos}) => `${nombre}: [${elementos.join(", ")}]`)
+        .join("\n");
+        escribir("Estado actual:\n" + txt);
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    document.getElementById("btnReset").onclick = async () => {
+      try {
+        await request("/api/init", { method: "POST", headers: {"Content-Type": "application/json"}, body: "{}" });
+        await refreshSelects();
+        escribir("Base reiniciada a valores iniciales (desde Prolog).");
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    document.getElementById("btnCrearLista").onclick = async () => {
+      const nombre = document.getElementById("nuevaListaNombre").value.trim();
+      const elementosRaw = document.getElementById("nuevaListaElementos").value.trim();
+
+      if (!nombre) {
+        escribir("Escribe un nombre para la nueva lista.");
+        return;
+      }
+
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(nombre)) {
+        escribir("Nombre no válido. Usa letras, números y guion bajo, iniciando con letra o _.");
+        return;
+      }
+
+      const elementos = elementosRaw
+        ? elementosRaw.split(",").map(e => e.trim()).filter(Boolean)
+        : [];
+
+      try {
+        const data = await request("/api/create_list", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista: nombre, elementos })
+        });
+        await refreshSelects();
+        document.getElementById("nuevaListaNombre").value = "";
+        document.getElementById("nuevaListaElementos").value = "";
+        escribir(`Lista '${data.nombre}' creada correctamente con ${data.elementos.length} elemento(s).`);
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    document.getElementById("btnListar").onclick = async () => {
+      const nombre = document.getElementById("listaA").value;
+      try {
+        const data = await request(`/api/list?nombre=${encodeURIComponent(nombre)}`);
+        escribir(`Elementos de ${nombre}:\n` + listarElementos(data.elementos));
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    document.getElementById("btnLongitud").onclick = async () => {
+      const nombre = document.getElementById("listaA").value;
+      try {
+        const data = await request(`/api/length?nombre=${encodeURIComponent(nombre)}`);
+        escribir(`Longitud de ${nombre}: ${data.longitud}`);
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    document.getElementById("btnOrdenar").onclick = async () => {
+      const nombre = document.getElementById("listaA").value;
+      try {
+        const data = await request("/api/sort", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista: nombre })
+        });
+        escribir(`Lista ordenada y actualizada (${nombre}):\n` + listarElementos(data.elementos));
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    document.getElementById("btnBuscar").onclick = async () => {
+      const nombre = document.getElementById("listaB").value;
+      const elemento = document.getElementById("elemento").value.trim();
+      if (!elemento) return escribir("Escribe un elemento.");
+
+      try {
+        let data = await request("/api/search", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista: nombre, elemento, agregarSiNoExiste: false })
+        });
+
+        if (data.encontrado) {
+          escribir(`Elemento '${elemento}' encontrado en ${nombre}.`);
+          return;
+        }
+
+        const agregar = window.confirm(`No se encontró '${elemento}' en ${nombre}. ¿Deseas agregarlo?`);
+        if (!agregar) {
+          escribir("No se realizaron cambios.");
+          return;
+        }
+
+        data = await request("/api/search", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista: nombre, elemento, agregarSiNoExiste: true })
+        });
+
+        escribir(`Elemento agregado en ${nombre}.\n` + listarElementos(data.elementos));
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    document.getElementById("btnAgregar").onclick = async () => {
+      const nombre = document.getElementById("listaB").value;
+      const elemento = document.getElementById("elemento").value.trim();
+      if (!elemento) return escribir("Escribe un elemento.");
+      try {
+        const data = await request("/api/add", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista: nombre, elemento })
+        });
+        escribir(`Elemento agregado en ${nombre}.\n` + listarElementos(data.elementos));
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    document.getElementById("btnEliminar").onclick = async () => {
+      const nombre = document.getElementById("listaB").value;
+      const elemento = document.getElementById("elemento").value.trim();
+      if (!elemento) return escribir("Escribe un elemento.");
+      try {
+        const data = await request("/api/remove", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista: nombre, elemento })
+        });
+        if (!data.eliminado) {
+          escribir(`El elemento '${elemento}' no existe en ${nombre}.`);
+        } else {
+          escribir(`Elemento eliminado de ${nombre}.\n` + listarElementos(data.elementos));
+        }
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    document.getElementById("btnConcatenar").onclick = async () => {
+      const a = document.getElementById("listaC1").value;
+      const b = document.getElementById("listaC2").value;
+      try {
+        const data = await request("/api/concat", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista1: a, lista2: b })
+        });
+        escribir(
+          `Concatenar ${a} + ${b}:\n` +
+          `- Resultado (concatenar_propia): [${data.resultado_propia.join(", ")}]\n` +
+          `- Resultado (concatenar_append): [${data.resultado_append.join(", ")}]`
+        );
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    document.getElementById("btnRecetas").onclick = async () => {
+      try {
+        const data = await request("/api/recipes_possible");
+        const posibles = data.recetas || [];
+        if (posibles.length === 0) {
+          escribir("Recetas posibles hoy:\n- Ninguna (faltan ingredientes)");
+        } else {
+          escribir("Ingredientes disponibles: [" + data.disponibles.join(", ") + "]\n\nRecetas posibles hoy:\n" + posibles.map(r => `- ${r}`).join("\n"));
+        }
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    (async () => {
+      try {
+        await request("/api/init", { method: "POST", headers: {"Content-Type": "application/json"}, body: "{}" });
+        await refreshSelects();
+        escribir("Interfaz conectada al backend local de Prolog. Inicia web_server.py y abre http://127.0.0.1:8000");
+      } catch (e) {
+        escribir("No se pudo conectar al backend local. Inicia: python3 web_server.py");
+      }
+    })();
+  </script>
+</body>
+</html>
