@@ -129,22 +129,6 @@
   </div>
 
   <script>
-    const estadoInicial = () => ({
-      disponibles: ["avena", "leche", "platano", "tomate", "tortilla", "pollo"],
-      compra_semana: ["huevo", "arroz", "frijol", "cebolla"],
-      recetas_favoritas: ["avena_desayuno", "tacos_pollo"]
-    });
-
-    const recetaDB = {
-      avena_desayuno: ["avena", "leche", "platano", "miel"],
-      ensalada_fresca: ["lechuga", "tomate", "pepino", "aceite_oliva"],
-      tacos_pollo: ["tortilla", "pollo", "cebolla", "cilantro"],
-      smoothie_fresa: ["leche", "fresa", "platano", "avena"],
-      pasta_vegetal: ["pasta", "tomate", "ajo", "aceite_oliva"]
-    };
-
-    let listas = estadoInicial();
-
     const salida = document.getElementById("salida");
     const listaSelectores = ["listaA", "listaB", "listaC1", "listaC2"].map(id => document.getElementById(id));
 
@@ -152,8 +136,18 @@
       salida.textContent = txt;
     };
 
-    const refreshSelects = () => {
-      const nombres = Object.keys(listas);
+    const request = async (url, options = {}) => {
+      const response = await fetch(url, options);
+      const data = await response.json();
+      if (!data.ok) {
+        throw new Error(data.error || "Error en API");
+      }
+      return data.data;
+    };
+
+    const refreshSelects = async () => {
+      const data = await request("/api/list_names");
+      const nombres = data.listas;
       for (const sel of listaSelectores) {
         const current = sel.value;
         sel.innerHTML = "";
@@ -168,42 +162,39 @@
     };
 
     const listarElementos = (arr) => arr.map(x => `- ${x}`).join("\n");
-    const buscarElemento = (elemento, arr) => arr.includes(elemento);
-    const concatenarPropia = (l1, l2) => l1.length === 0 ? [...l2] : [l1[0], ...concatenarPropia(l1.slice(1), l2)];
-    const concatenarAppend = (l1, l2) => [...l1, ...l2];
-    const agregarElemento = (elemento, arr) => [...arr, elemento];
-    const eliminarElemento = (elemento, arr) => {
-      const idx = arr.indexOf(elemento);
-      if (idx === -1) return null;
-      return [...arr.slice(0, idx), ...arr.slice(idx + 1)];
-    };
-    const longitudLista = (arr) => arr.length;
-    const ordenarLista = (arr) => [...arr].sort();
-    const subsetLista = (sub, l) => sub.every(x => l.includes(x));
 
-    const recetaPosible = (disponibles) =>
-      Object.entries(recetaDB)
-        .filter(([, ingredientes]) => subsetLista(ingredientes, disponibles))
-        .map(([nombre]) => nombre);
-
-    document.getElementById("btnVerListas").onclick = () => {
-      escribir("Listas disponibles:\n" + Object.keys(listas).map(n => `- ${n}`).join("\n"));
+    document.getElementById("btnVerListas").onclick = async () => {
+      try {
+        const data = await request("/api/list_names");
+        escribir("Listas disponibles:\n" + data.listas.map(n => `- ${n}`).join("\n"));
+      } catch (e) {
+        escribir(e.message);
+      }
     };
 
-    document.getElementById("btnVerEstado").onclick = () => {
-      const txt = Object.entries(listas)
-        .map(([n, l]) => `${n}: [${l.join(", ")}]`)
+    document.getElementById("btnVerEstado").onclick = async () => {
+      try {
+        const data = await request("/api/full_state");
+        const txt = data.estado
+        .map(({nombre, elementos}) => `${nombre}: [${elementos.join(", ")}]`)
         .join("\n");
-      escribir("Estado actual:\n" + txt);
+        escribir("Estado actual:\n" + txt);
+      } catch (e) {
+        escribir(e.message);
+      }
     };
 
-    document.getElementById("btnReset").onclick = () => {
-      listas = estadoInicial();
-      refreshSelects();
-      escribir("Base reiniciada a valores iniciales.");
+    document.getElementById("btnReset").onclick = async () => {
+      try {
+        await request("/api/init", { method: "POST", headers: {"Content-Type": "application/json"}, body: "{}" });
+        await refreshSelects();
+        escribir("Base reiniciada a valores iniciales (desde Prolog).");
+      } catch (e) {
+        escribir(e.message);
+      }
     };
 
-    document.getElementById("btnCrearLista").onclick = () => {
+    document.getElementById("btnCrearLista").onclick = async () => {
       const nombre = document.getElementById("nuevaListaNombre").value.trim();
       const elementosRaw = document.getElementById("nuevaListaElementos").value.trim();
 
@@ -217,101 +208,172 @@
         return;
       }
 
-      if (Object.prototype.hasOwnProperty.call(listas, nombre)) {
-        escribir(`La lista '${nombre}' ya existe.`);
-        return;
-      }
-
       const elementos = elementosRaw
         ? elementosRaw.split(",").map(e => e.trim()).filter(Boolean)
         : [];
 
-      listas[nombre] = elementos;
-      refreshSelects();
-      document.getElementById("nuevaListaNombre").value = "";
-      document.getElementById("nuevaListaElementos").value = "";
-      escribir(`Lista '${nombre}' creada correctamente con ${elementos.length} elemento(s).`);
+      try {
+        const data = await request("/api/create_list", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista: nombre, elementos })
+        });
+        await refreshSelects();
+        document.getElementById("nuevaListaNombre").value = "";
+        document.getElementById("nuevaListaElementos").value = "";
+        escribir(`Lista '${data.nombre}' creada correctamente con ${data.elementos.length} elemento(s).`);
+      } catch (e) {
+        escribir(e.message);
+      }
     };
 
-    document.getElementById("btnListar").onclick = () => {
+    document.getElementById("btnListar").onclick = async () => {
       const nombre = document.getElementById("listaA").value;
-      escribir(`Elementos de ${nombre}:\n` + listarElementos(listas[nombre]));
+      try {
+        const data = await request(`/api/list?nombre=${encodeURIComponent(nombre)}`);
+        escribir(`Elementos de ${nombre}:\n` + listarElementos(data.elementos));
+      } catch (e) {
+        escribir(e.message);
+      }
     };
 
-    document.getElementById("btnLongitud").onclick = () => {
+    document.getElementById("btnLongitud").onclick = async () => {
       const nombre = document.getElementById("listaA").value;
-      escribir(`Longitud de ${nombre}: ${longitudLista(listas[nombre])}`);
+      try {
+        const data = await request(`/api/length?nombre=${encodeURIComponent(nombre)}`);
+        escribir(`Longitud de ${nombre}: ${data.longitud}`);
+      } catch (e) {
+        escribir(e.message);
+      }
     };
 
-    document.getElementById("btnOrdenar").onclick = () => {
+    document.getElementById("btnOrdenar").onclick = async () => {
       const nombre = document.getElementById("listaA").value;
-      listas[nombre] = ordenarLista(listas[nombre]);
-      escribir(`Lista ordenada y actualizada (${nombre}):\n` + listarElementos(listas[nombre]));
+      try {
+        const data = await request("/api/sort", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista: nombre })
+        });
+        escribir(`Lista ordenada y actualizada (${nombre}):\n` + listarElementos(data.elementos));
+      } catch (e) {
+        escribir(e.message);
+      }
     };
 
-    document.getElementById("btnBuscar").onclick = () => {
+    document.getElementById("btnBuscar").onclick = async () => {
       const nombre = document.getElementById("listaB").value;
       const elemento = document.getElementById("elemento").value.trim();
       if (!elemento) return escribir("Escribe un elemento.");
 
-      if (buscarElemento(elemento, listas[nombre])) {
-        escribir(`Elemento '${elemento}' encontrado en ${nombre}.`);
-      } else {
-        const agregar = window.confirm(`No se encontró '${elemento}' en ${nombre}. ¿Deseas agregarlo?`);
-        if (agregar) {
-          listas[nombre] = agregarElemento(elemento, listas[nombre]);
-          escribir(`Elemento agregado en ${nombre}.\n` + listarElementos(listas[nombre]));
-        } else {
-          escribir("No se realizaron cambios.");
+      try {
+        let data = await request("/api/search", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista: nombre, elemento, agregarSiNoExiste: false })
+        });
+
+        if (data.encontrado) {
+          escribir(`Elemento '${elemento}' encontrado en ${nombre}.`);
+          return;
         }
+
+        const agregar = window.confirm(`No se encontró '${elemento}' en ${nombre}. ¿Deseas agregarlo?`);
+        if (!agregar) {
+          escribir("No se realizaron cambios.");
+          return;
+        }
+
+        data = await request("/api/search", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista: nombre, elemento, agregarSiNoExiste: true })
+        });
+
+        escribir(`Elemento agregado en ${nombre}.\n` + listarElementos(data.elementos));
+      } catch (e) {
+        escribir(e.message);
       }
     };
 
-    document.getElementById("btnAgregar").onclick = () => {
+    document.getElementById("btnAgregar").onclick = async () => {
       const nombre = document.getElementById("listaB").value;
       const elemento = document.getElementById("elemento").value.trim();
       if (!elemento) return escribir("Escribe un elemento.");
-      listas[nombre] = agregarElemento(elemento, listas[nombre]);
-      escribir(`Elemento agregado en ${nombre}.\n` + listarElementos(listas[nombre]));
-    };
-
-    document.getElementById("btnEliminar").onclick = () => {
-      const nombre = document.getElementById("listaB").value;
-      const elemento = document.getElementById("elemento").value.trim();
-      if (!elemento) return escribir("Escribe un elemento.");
-      const nueva = eliminarElemento(elemento, listas[nombre]);
-      if (!nueva) {
-        escribir(`El elemento '${elemento}' no existe en ${nombre}.`);
-      } else {
-        listas[nombre] = nueva;
-        escribir(`Elemento eliminado de ${nombre}.\n` + listarElementos(listas[nombre]));
+      try {
+        const data = await request("/api/add", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista: nombre, elemento })
+        });
+        escribir(`Elemento agregado en ${nombre}.\n` + listarElementos(data.elementos));
+      } catch (e) {
+        escribir(e.message);
       }
     };
 
-    document.getElementById("btnConcatenar").onclick = () => {
+    document.getElementById("btnEliminar").onclick = async () => {
+      const nombre = document.getElementById("listaB").value;
+      const elemento = document.getElementById("elemento").value.trim();
+      if (!elemento) return escribir("Escribe un elemento.");
+      try {
+        const data = await request("/api/remove", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista: nombre, elemento })
+        });
+        if (!data.eliminado) {
+          escribir(`El elemento '${elemento}' no existe en ${nombre}.`);
+        } else {
+          escribir(`Elemento eliminado de ${nombre}.\n` + listarElementos(data.elementos));
+        }
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    document.getElementById("btnConcatenar").onclick = async () => {
       const a = document.getElementById("listaC1").value;
       const b = document.getElementById("listaC2").value;
-      const r1 = concatenarPropia(listas[a], listas[b]);
-      const r2 = concatenarAppend(listas[a], listas[b]);
-      escribir(
-        `Concatenar ${a} + ${b}:\n` +
-        `- Resultado (concatenar_propia): [${r1.join(", ")}]\n` +
-        `- Resultado (concatenar_append): [${r2.join(", ")}]`
-      );
-    };
-
-    document.getElementById("btnRecetas").onclick = () => {
-      const disponibles = listas.disponibles || [];
-      const posibles = recetaPosible(disponibles);
-      if (posibles.length === 0) {
-        escribir("Recetas posibles hoy:\n- Ninguna (faltan ingredientes)");
-      } else {
-        escribir("Ingredientes disponibles: [" + disponibles.join(", ") + "]\n\nRecetas posibles hoy:\n" + posibles.map(r => `- ${r}`).join("\n"));
+      try {
+        const data = await request("/api/concat", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ lista1: a, lista2: b })
+        });
+        escribir(
+          `Concatenar ${a} + ${b}:\n` +
+          `- Resultado (concatenar_propia): [${data.resultado_propia.join(", ")}]\n` +
+          `- Resultado (concatenar_append): [${data.resultado_append.join(", ")}]`
+        );
+      } catch (e) {
+        escribir(e.message);
       }
     };
 
-    refreshSelects();
-    escribir("Interfaz local lista. Abre este archivo en el navegador y úsalo sin servidor.");
+    document.getElementById("btnRecetas").onclick = async () => {
+      try {
+        const data = await request("/api/recipes_possible");
+        const posibles = data.recetas || [];
+        if (posibles.length === 0) {
+          escribir("Recetas posibles hoy:\n- Ninguna (faltan ingredientes)");
+        } else {
+          escribir("Ingredientes disponibles: [" + data.disponibles.join(", ") + "]\n\nRecetas posibles hoy:\n" + posibles.map(r => `- ${r}`).join("\n"));
+        }
+      } catch (e) {
+        escribir(e.message);
+      }
+    };
+
+    (async () => {
+      try {
+        await request("/api/init", { method: "POST", headers: {"Content-Type": "application/json"}, body: "{}" });
+        await refreshSelects();
+        escribir("Interfaz conectada al backend local de Prolog. Inicia web_server.py y abre http://127.0.0.1:8000");
+      } catch (e) {
+        escribir("No se pudo conectar al backend local. Inicia: python3 web_server.py");
+      }
+    })();
   </script>
 </body>
 </html>
