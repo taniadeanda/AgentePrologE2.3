@@ -1,3 +1,9 @@
+%DE ANDA LARA TANIA CITLALY
+%GÓMEZ NAVARRO JUAN FERNANDO
+%GONZÁLEZ JIMENEZ JUAN PABLO
+%GONZÁLEZ SERNA MATEO
+%JIMENÉZ CARMONA DIEGO ANDREI
+
 :- consult('BaseConocimiento.pl').
 :- consult('OperacionesListas.pl').
 
