@@ -1,3 +1,4 @@
+%todo este archivo se dedica de mostrar la parte grafica de nuestro programa ordenandolo en diferentes apartados
 :- use_module(library(http/json)).
 :- consult('BaseConocimiento.pl').
 :- consult('OperacionesListas.pl').

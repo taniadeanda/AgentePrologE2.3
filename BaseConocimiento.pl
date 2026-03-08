@@ -1,8 +1,6 @@
 :- dynamic lista/2.
 
-% ===========================================
-% CASO REAL: PLANIFICADOR SEMANAL DE COMIDAS
-% ===========================================
+%aqui guardamos toda nuestra informacion
 
 % Hechos del dominio (recetas e ingredientes)
 receta(avena_desayuno, [avena, leche, platano, miel]).

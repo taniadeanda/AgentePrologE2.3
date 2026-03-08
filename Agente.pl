@@ -1,3 +1,4 @@
+%consultas para el conocimiento
 :- consult('BaseConocimiento.pl').
 :- consult('OperacionesListas.pl').
 
@@ -15,7 +16,7 @@ menu :-
     write('------------- MENU PRINCIPAL -------------'), nl,
     write('1) Ver nombres de listas'), nl,
     write('2) Listar elementos de una lista'), nl,
-    write('3) Buscar elemento (si no existe, ofrece agregarlo)'), nl,
+    write('3) Buscar elemento '), nl,
     write('4) Concatenar dos listas (propia y append)'), nl,
     write('5) Agregar elemento a lista'), nl,
     write('6) Eliminar elemento de lista'), nl,
@@ -27,6 +28,7 @@ menu :-
     read(Opcion),
     ejecutar_opcion(Opcion).
 
+%se agrego un switch para selecicionar que queremos que haga nuestro agente
 ejecutar_opcion(1) :-
     mostrar_listas,
     menu.
@@ -60,13 +62,16 @@ ejecutar_opcion(_) :-
     write('Opcion no valida.'), nl,
     menu.
 
+%apartir de aqui empezamos los "metodos para empezar el manejo de las listas"
+%esta primera se dedica a mostrar las listas que tenemos
 mostrar_listas :-
     nl,
     write('Listas disponibles:'), nl,
     forall(lista(Nombre, _), (write('- '), write(Nombre), nl)).
 
+%se ensenan los elementos de una lista seleccionada
 pedir_lista(NombreLista) :-
-    write('Ingresa el nombre de la lista (ej. disponibles): '),
+    write('Ingresa el nombre de la lista: '),
     read(NombreLista).
 
 opcion_listar :-
@@ -77,6 +82,7 @@ opcion_listar :-
     ;   write('No existe esa lista.'), nl
     ).
 
+%aqui nos dedicamos a buscar un elemneto
 opcion_buscar :-
     pedir_lista(NombreLista),
     (   obtener_lista(NombreLista, Lista)
@@ -101,6 +107,7 @@ manejar_agregado_condicional(no, _, _, _) :-
 manejar_agregado_condicional(_, _, _, _) :-
     write('Respuesta no valida. No se realizaron cambios.'), nl.
 
+%aqui hacemos la interseccion entre listas
 opcion_concatenar :-
     write('Primera lista: '),
     read(ListaA),
@@ -113,7 +120,7 @@ opcion_concatenar :-
         write('Resultado (concatenar_append): '), write(R2), nl
     ;   write('Una o ambas listas no existen.'), nl
     ).
-
+%aqui agregamos un elemento a alguna litta
 opcion_agregar :-
     pedir_lista(NombreLista),
     (   obtener_lista(NombreLista, Lista)
@@ -126,6 +133,7 @@ opcion_agregar :-
     ;   write('No existe esa lista.'), nl
     ).
 
+%aqui eliminamos algun elemnto de un carro
 opcion_eliminar :-
     pedir_lista(NombreLista),
     (   obtener_lista(NombreLista, Lista)
@@ -140,6 +148,7 @@ opcion_eliminar :-
     ;   write('No existe esa lista.'), nl
     ).
 
+%aqui se cuenta cual es la longitud de una lista
 opcion_longitud :-
     pedir_lista(NombreLista),
     (   obtener_lista(NombreLista, Lista)
@@ -148,6 +157,7 @@ opcion_longitud :-
     ;   write('No existe esa lista.'), nl
     ).
 
+%opcion para ordenar las listas
 opcion_ordenar :-
     pedir_lista(NombreLista),
     (   obtener_lista(NombreLista, Lista)
@@ -158,6 +168,7 @@ opcion_ordenar :-
     ;   write('No existe esa lista.'), nl
     ).
 
+%aqui se nos dan las opciones de las recetas que podemos obtener
 opcion_recetas_posibles :-
     (   obtener_lista(disponibles, Disponibles)
     ->  write('Ingredientes disponibles actuales: '), write(Disponibles), nl,

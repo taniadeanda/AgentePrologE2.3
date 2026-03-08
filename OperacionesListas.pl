@@ -1,6 +1,4 @@
-% ===========================================
-% OPERACIONES FUNCIONALES SOBRE LISTAS
-% ===========================================
+%en este archivo tenemos guardadas todas las operaciones para trabjar con nuestras listas
 
 obtener_lista(NombreLista, Lista) :-
     lista(NombreLista, Lista).
@@ -45,9 +43,7 @@ receta_posible(Disponibles, NombreReceta) :-
     receta(NombreReceta, Ingredientes),
     subset_lista(Ingredientes, Disponibles).
 
-% ===========================================
-% SOPORTE WEB (estado persistente entre requests)
-% ===========================================
+%en estos apartados hacemos el manejo de las listas en la web
 
 preparar_estado_web :-
     retractall(lista(_, _)),
